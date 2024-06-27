@@ -1,0 +1,95 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+import folium
+from folium.plugins import HeatMap
+
+# Load the dataset
+df = pd.read_csv('US_Accidents_Dec20.csv')
+
+# Data Cleaning
+# Check for missing values
+missing_values = df.isnull().sum()
+print(f"Missing values:\n{missing_values}")
+
+# Drop columns with a high percentage of missing values if necessary
+threshold = 0.5  # 50% threshold
+df = df[df.columns[df.isnull().mean() < threshold]]
+
+# Fill missing values for columns that are important
+df['Weather_Condition'].fillna('Unknown', inplace=True)
+df['Road_Condition'].fillna('Unknown', inplace=True)
+df['Temperature(F)'].fillna(df['Temperature(F)'].mean(), inplace=True)
+
+# Convert date columns to datetime
+df['Start_Time'] = pd.to_datetime(df['Start_Time'])
+df['End_Time'] = pd.to_datetime(df['End_Time'])
+
+# Extract additional time-related features
+df['Year'] = df['Start_Time'].dt.year
+df['Month'] = df['Start_Time'].dt.month
+df['Day'] = df['Start_Time'].dt.day
+df['Hour'] = df['Start_Time'].dt.hour
+df['Day_of_Week'] = df['Start_Time'].dt.dayofweek
+
+# EDA: Analyze distribution of accidents by time of day
+plt.figure(figsize=(10, 6))
+sns.histplot(df['Hour'], bins=24, kde=False, color='blue')
+plt.title('Distribution of Accidents by Hour of Day')
+plt.xlabel('Hour of Day')
+plt.ylabel('Number of Accidents')
+plt.show()
+
+# EDA: Analyze distribution of accidents by weather conditions
+plt.figure(figsize=(14, 8))
+weather_counts = df['Weather_Condition'].value_counts().head(10)
+sns.barplot(x=weather_counts.index, y=weather_counts.values, palette='viridis')
+plt.title('Top 10 Weather Conditions for Accidents')
+plt.xlabel('Weather Condition')
+plt.xticks(rotation=45)
+plt.ylabel('Number of Accidents')
+plt.show()
+
+# EDA: Analyze distribution of accidents by road conditions
+plt.figure(figsize=(14, 8))
+road_counts = df['Road_Condition'].value_counts().head(10)
+sns.barplot(x=road_counts.index, y=road_counts.values, palette='magma')
+plt.title('Top 10 Road Conditions for Accidents')
+plt.xlabel('Road Condition')
+plt.xticks(rotation=45)
+plt.ylabel('Number of Accidents')
+plt.show()
+
+# Visualize accident hotspots using Folium
+def generate_base_map(default_location=[39.5, -98.35], default_zoom_start=4):
+    base_map = folium.Map(location=default_location, control_scale=True, zoom_start=default_zoom_start)
+    return base_map
+
+# Filter data for hotspots visualization (reduce the size for faster processing)
+sample_df = df.sample(n=10000, random_state=42)
+
+# Create a map
+base_map = generate_base_map()
+
+# Add heatmap layer
+heat_data = [[row['Start_Lat'], row['Start_Lng']] for index, row in sample_df.iterrows()]
+HeatMap(heat_data).add_to(base_map)
+
+# Save the map as an HTML file
+base_map.save('accident_hotspots.html')
+
+# Contributing factors analysis
+plt.figure(figsize=(14, 8))
+contributing_factors = df['Weather_Condition'].value_counts().head(10)
+sns.barplot(x=contributing_factors.index, y=contributing_factors.values, palette='plasma')
+plt.title('Top Contributing Weather Conditions to Accidents')
+plt.xlabel('Weather Condition')
+plt.xticks(rotation=45)
+plt.ylabel('Number of Accidents')
+plt.show()
+
+# Save cleaned dataset
+df.to_csv('Cleaned_US_Accidents_Dec20.csv', index=False)
